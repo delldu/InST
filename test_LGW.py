@@ -131,6 +131,7 @@ def test(args):
 
     model.eval()
     # model -- mask_RAFT(...)
+    # torch.jit.script(model)
 
     for i, source_mask_path in enumerate(source_mask_paths):
         source_mask_img = Image.open(source_mask_path).convert("RGB")
@@ -154,7 +155,10 @@ def test(args):
             #     ToTensor()
             # )
             with torch.no_grad():
-                warped_source_images, warped_source_masks = model(source_image, source_mask, target_mask, refine_time=args.refine_time)
+                warped_image_mask_list = model(source_image, source_mask, target_mask, refine_time=args.refine_time)
+
+            warped_source_images = warped_image_mask_list[0 : args.refine_time]
+            warped_source_masks = warped_image_mask_list[args.refine_time: ]
 
             save_image_name = (
                 source_mask_path.name.split(".")[0]

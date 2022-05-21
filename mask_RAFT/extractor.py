@@ -4,6 +4,8 @@ import torch.nn.functional as F
 from torchvision import models
 from collections import namedtuple
 
+from typing import List
+
 
 class ResidualBlock(nn.Module):
     def __init__(self, in_planes, planes, norm_fn="group", stride=1):
@@ -162,13 +164,9 @@ class BasicEncoder(nn.Module):
         self.in_planes = dim
         return nn.Sequential(*layers)
 
-    def forward(self, x):
-
-        # if input is list, combine batch dimension
-        is_list = isinstance(x, tuple) or isinstance(x, list)
-        if is_list:
-            batch_dim = x[0].shape[0]
-            x = torch.cat(x, dim=0)
+    def forward(self, x: List[torch.Tensor]):
+        batch_dim = x[0].shape[0]
+        x = torch.cat(x, dim=0)
 
         x = self.conv1(x)
         x = self.norm1(x)
@@ -183,8 +181,7 @@ class BasicEncoder(nn.Module):
         if self.training and self.dropout is not None:
             x = self.dropout(x)
 
-        if is_list:
-            x = torch.split(x, [batch_dim, batch_dim], dim=0)
+        x = torch.split(x, [batch_dim, batch_dim], dim=0)
 
         return x
 
@@ -241,6 +238,7 @@ class SmallEncoder(nn.Module):
 
         # if input is list, combine batch dimension
         is_list = isinstance(x, tuple) or isinstance(x, list)
+
         if is_list:
             batch_dim = x[0].shape[0]
             x = torch.cat(x, dim=0)

@@ -14,7 +14,7 @@ def bilinear_sampler(img, coords):
     return img
 
 
-def coords_grid(batch, height, width):
+def coords_grid(batch: int, height: int, width: int):
     coords = torch.meshgrid(torch.arange(height), torch.arange(width))
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].repeat(batch, 1, 1, 1)

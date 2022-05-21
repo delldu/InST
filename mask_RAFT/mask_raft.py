@@ -16,23 +16,35 @@ from utils.utils import coords_grid
 
 from warp import apply_warp_by_field
 
+from typing import List
+from typing import Tuple
+
 import pdb
 
 
-def get_pos_encoding_table(n_position, d_hid):
-    """Sinusoid position encoding table"""
-    # TODO: make it with torch instead of numpy
+def get_pos_encoding_table(n_position: int, d_hid: int):
+    #  n_position, d_hid -- (1024, 256)
 
-    def get_position_angle_vec(position):
-        # this part calculate the position In brackets
-        return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
+    # def get_position_angle_vec(position):
+    #     # this part calculate the position In brackets
+    #     return [position / np.power(10000, 2 * (hid_j // 2) / d_hid) for hid_j in range(d_hid)]
 
-    encoding_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
-    # [:, 0::2] are all even subscripts, is dim_2i
-    encoding_table[:, 0::2] = np.sin(encoding_table[:, 0::2])  # dim 2i
-    encoding_table[:, 1::2] = np.cos(encoding_table[:, 1::2])  # dim 2i+1
+    # encoding_table = np.array([get_position_angle_vec(pos_i) for pos_i in range(n_position)])
+    # # [:, 0::2] are all even subscripts, is dim_2i
+    # encoding_table[:, 0::2] = np.sin(encoding_table[:, 0::2])  # dim 2i
+    # encoding_table[:, 1::2] = np.cos(encoding_table[:, 1::2])  # dim 2i+1
 
-    return torch.FloatTensor(encoding_table).unsqueeze(0)
+    # # encoding_table.shape -- (1024, 256)
+    # return torch.FloatTensor(encoding_table).unsqueeze(0) # ==> [1, 1024, 256]
+
+
+    encoding_table = torch.zeros(n_position, d_hid)
+    index = torch.tensor([(2 * (j // 2) / d_hid) for j in range(d_hid)])
+    for i in range(n_position):
+        t = float(i)/torch.pow(10000, index)
+        encoding_table[:, 0::2] = torch.sin(t[0::2])
+        encoding_table[:, 1::2] = torch.cos(t[1::2])
+    return encoding_table.unsqueeze(0)
 
 
 class mask_RAFT(nn.Module):
@@ -71,6 +83,8 @@ class mask_RAFT(nn.Module):
 
         # self.pos_embed = get_pos_encoding_table(32*32,256).permute(0,2,1).view(1,-1,32,32)
 
+        self.corr = CorrBlock(radius=self.args.corr_radius)
+
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
@@ -98,8 +112,8 @@ class mask_RAFT(nn.Module):
         source_image,
         source_mask,
         target_mask,
-        refine_time=12,
-    ):
+        refine_time: int=12,
+    ) -> List[torch.Tensor]:
 
         # run the feature network
         fmap1, fmap2 = self.fnet([source_mask, target_mask])
@@ -116,7 +130,7 @@ class mask_RAFT(nn.Module):
         fmap1 = fmap1 + pos_embed.to(fmap1.device)
         fmap2 = fmap2 + pos_embed.to(fmap2.device)
 
-        corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
+        # corr_fn = CorrBlock(fmap1, fmap2, radius=self.args.corr_radius)
 
         # run the context network
         net, inp = torch.split(fmap2, [self.hidden_dim, self.context_dim], dim=1)
@@ -127,9 +141,10 @@ class mask_RAFT(nn.Module):
 
         flow_predictions = []
         # down_flow_predictions = []
-        for _ in range(refine_time):
+        for i in range(refine_time):
             coords1 = coords1.detach()
-            corr = corr_fn(coords1)  # index correlation volume
+            # corr = corr_fn(coords1)  # index correlation volume
+            corr = self.corr(fmap1, fmap2, coords1)
 
             flow = coords1 - coords0
             net, up_mask, delta_flow = self.update_block(net, inp, corr, flow)
@@ -143,14 +158,14 @@ class mask_RAFT(nn.Module):
             flow_predictions.append(flow_up)
             # down_flow_predictions.append(coords1 - coords0)
 
-        warped_source_images = []
-        warped_source_masks = []
+        warped_image_mask_list: List[torch.Tensor] = []
         for flow_up in flow_predictions:
             image = apply_warp_by_field(source_image.clone(), flow_up)
-            warped_source_images.append(image)
+            warped_image_mask_list.append(image)
 
+        for flow_up in flow_predictions:
             mask = apply_warp_by_field(source_mask.clone(), flow_up)
-            warped_source_masks.append(mask)
+            warped_image_mask_list.append(mask)
 
-        return warped_source_images, warped_source_masks
+        return warped_image_mask_list
 
