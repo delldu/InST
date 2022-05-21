@@ -93,9 +93,9 @@ def interpolate_bilinear(grid, query_points, indexing:str="ij"):
     #     interp_bottom = alphas[1] * (bottom_right - bottom_left) + bottom_left
     #     interp = alphas[0] * (interp_bottom - interp_top) + interp_top
 
-    interp_top = alphas[1].cuda() * (top_right - top_left) + top_left
-    interp_bottom = alphas[1].cuda() * (bottom_right - bottom_left) + bottom_left
-    interp = alphas[0].cuda() * (interp_bottom - interp_top) + interp_top
+    interp_top = alphas[1].to(grid.device) * (top_right - top_left) + top_left
+    interp_bottom = alphas[1].to(grid.device) * (bottom_right - bottom_left) + bottom_left
+    interp = alphas[0].to(grid.device) * (interp_bottom - interp_top) + interp_top
 
     return interp
 
