@@ -131,7 +131,7 @@ def test(args):
 
     model.eval()
     # model -- mask_RAFT(...)
-    # torch.jit.script(model)
+    torch.jit.script(model)
 
     for i, source_mask_path in enumerate(source_mask_paths):
         source_mask_img = Image.open(source_mask_path).convert("RGB")
