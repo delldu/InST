@@ -145,7 +145,7 @@ def test(args):
         # )
 
         source_img = Image.open(source_paths[i]).convert("RGB")
-        source = source_transform(source_img).unsqueeze(0).to(device)
+        source_image = source_transform(source_img).unsqueeze(0).to(device)
 
         source_mask = source_mask.to(device)
         for target_mask_path in target_mask_paths:
@@ -157,13 +157,7 @@ def test(args):
             #     ToTensor()
             # )
             with torch.no_grad():
-                flow_predictions, warped_source_mask_list = model(source_mask, target_mask, refine_time=args.refine_time)
-
-            # Extra source images warp
-            warped_source_list = []
-            for flow in flow_predictions:
-                warped_source = apply_warp_by_field(source.clone(), flow.clone())
-                warped_source_list.append(warped_source)
+                warped_source_images, warped_source_masks = model(source_image, source_mask, target_mask, refine_time=args.refine_time)
 
             save_image_name = (
                 source_mask_path.name.split(".")[0]
@@ -174,9 +168,9 @@ def test(args):
             save_image(
                 torch.cat(
                     [source_mask, target_mask]
-                    + warped_source_mask_list
-                    + [source, target_mask]
-                    + warped_source_list,
+                    + warped_source_masks
+                    + [source_image, target_mask]
+                    + warped_source_images,
                     dim=0,
                 ).cpu(),
                 str(Path(output_dir, save_image_name)),
@@ -193,7 +187,7 @@ def test(args):
                 + f"_refine{args.refine_time}.jpg"
             )
             save_image(
-                warped_source_list[-1].cpu(),
+                warped_source_images[-1].cpu(),
                 str(Path(output_dir, single_image_name)),
                 scale_each=True,
                 nrow=1,

@@ -95,13 +95,14 @@ class mask_RAFT(nn.Module):
 
     def forward(
         self,
-        image1,
-        image2,
+        source_image,
+        source_mask,
+        target_mask,
         refine_time=12,
     ):
 
         # run the feature network
-        fmap1, fmap2 = self.fnet([image1, image2])
+        fmap1, fmap2 = self.fnet([source_mask, target_mask])
 
         fmap1 = fmap1.float()
         fmap2 = fmap2.float()
@@ -122,7 +123,7 @@ class mask_RAFT(nn.Module):
         net = torch.tanh(net)
         inp = torch.relu(inp)
 
-        coords0, coords1 = self.initialize_flow(image1)
+        coords0, coords1 = self.initialize_flow(source_mask)
 
         flow_predictions = []
         # down_flow_predictions = []
@@ -142,10 +143,14 @@ class mask_RAFT(nn.Module):
             flow_predictions.append(flow_up)
             # down_flow_predictions.append(coords1 - coords0)
 
-        warped_image1_list = []
+        warped_source_images = []
+        warped_source_masks = []
         for flow_up in flow_predictions:
-            warped_img1 = apply_warp_by_field(image1.clone(), flow_up)
-            warped_image1_list.append(warped_img1)
+            image = apply_warp_by_field(source_image.clone(), flow_up)
+            warped_source_images.append(image)
 
-        return flow_predictions, warped_image1_list
+            mask = apply_warp_by_field(source_mask.clone(), flow_up)
+            warped_source_masks.append(mask)
+
+        return warped_source_images, warped_source_masks
 
