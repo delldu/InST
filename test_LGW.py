@@ -10,9 +10,6 @@ from torchvision.utils import save_image
 
 sys.path.append("mask_RAFT")
 from mask_RAFT.mask_raft import mask_RAFT
-
-from warp import apply_warp_by_field
-# from utils_save import flow_to_image
 from segmentation import segment
 
 import pdb
