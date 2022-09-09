@@ -125,8 +125,8 @@ def image_predict(source_images, source_masks, target_masks, output_dir):
                 output_tensor.cpu(),
                 output_file,
                 nrow=2 + 6,  # 6 -- refine_time defined in model
-                padding=1,
-                pad_value=255,
+                padding=2,
+                pad_value=0.5,
             )
 
 
