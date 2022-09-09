@@ -17,6 +17,7 @@ import math
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
+from torchvision.utils import save_image
 
 import redos
 import todos
@@ -40,36 +41,21 @@ def get_model():
     device = todos.model.get_device()
     model = model.to(device)
     model.eval()
-    pdb.set_trace()
 
     model = torch.jit.script(model)
-    pdb.set_trace()
-
     todos.data.mkdir("output")
     if not os.path.exists("output/image_shape_style.torch"):
         model.save("output/image_shape_style.torch")
 
-    pdb.set_trace()
-
     return model, device
 
 
-def model_forward(model, device, content_tensor, style_tensor):
-    content_tensor = content_tensor.to(device)
-    style_tensor = style_tensor.to(device)
+def model_forward(model, device, input_tensor):
+    input_tensor = input_tensor.to(device)
     with torch.no_grad():
-        output_tensor = model(content_tensor, style_tensor)
+        output_tensor = model(input_tensor)
 
     return output_tensor
-
-
-# def model_forward(model, device, input_tensor, multi_times):
-#     # zeropad for model
-#     H, W = input_tensor.size(2), input_tensor.size(3)
-#     if H % multi_times != 0 or W % multi_times != 0:
-#         input_tensor = todos.data.zeropad_tensor(input_tensor, times=multi_times)
-#     output_tensor = todos.model.forward(model, device, input_tensor)
-#     return output_tensor[:, :, 0:H, 0:W]
 
 
 def image_client(name, input_files, output_dir):
@@ -101,7 +87,7 @@ def image_server(name, host="localhost", port=6379):
     return redos.image.service(name, "image_shape_style", do_service, host, port)
 
 
-def image_predict(input_files, style_file, output_dir):
+def image_predict(source_images, source_masks, target_masks, output_dir):
     # Create directory to store result
     todos.data.mkdir(output_dir)
 
@@ -109,29 +95,39 @@ def image_predict(input_files, style_file, output_dir):
     model, device = get_model()
 
     # load files
-    image_filenames = todos.data.load_files(input_files)
-    style_tensor = todos.data.load_tensor(style_file)
+    source_image_files = todos.data.load_files(source_images)
+    source_mask_files = todos.data.load_files(source_masks)
+    target_mask_files = todos.data.load_files(target_masks)
 
     # start predict
-    progress_bar = tqdm(total=len(image_filenames))
-    for filename in image_filenames:
-        progress_bar.update(1)
+    progress_bar = tqdm(total=len(source_image_files) * len(target_mask_files))
+    for i, source_image_file in enumerate(source_image_files):
+        source_image_tensor = todos.data.load_tensor(source_image_file)
+        source_image_tensor = F.interpolate(source_image_tensor, size=(256, 256), mode="bilinear", align_corners=False)
 
-        # orig input
-        content_tensor = todos.data.load_tensor(filename)
-        B, C, H, W = content_tensor.shape
-        Hnew = int(PHOTO_STYLE_MULTI_TIMES * math.ceil(H / PHOTO_STYLE_MULTI_TIMES))
-        Wnew = int(PHOTO_STYLE_MULTI_TIMES * math.ceil(W / PHOTO_STYLE_MULTI_TIMES))
-        if Hnew != H or Wnew != W:
-            content_tensor = F.interpolate(content_tensor, size=(Hnew, Wnew), mode="bilinear", align_corners=False)
-        B, C, H, W = style_tensor.shape
-        if Hnew != H or Wnew != W:
-            style_tensor = F.interpolate(style_tensor, size=(Hnew, Wnew), mode="bilinear", align_corners=False)
+        source_mask_tensor = todos.data.load_tensor(source_mask_files[i])
+        source_mask_tensor = F.interpolate(source_mask_tensor, size=(256, 256), mode="bilinear", align_corners=False)
 
-        predict_tensor = model_forward(model, device, content_tensor, style_tensor)
-        output_file = f"{output_dir}/{os.path.basename(filename)}"
+        for target_mask_file in target_mask_files:
+            progress_bar.update(1)
 
-        todos.data.save_tensor([content_tensor, style_tensor, predict_tensor], output_file)
+            target_mask_tensor = todos.data.load_tensor(target_mask_file)
+            target_mask_tensor = F.interpolate(
+                target_mask_tensor, size=(256, 256), mode="bilinear", align_corners=False
+            )
+
+            # input == source_image + source_mask + target_mask
+            input_tensor = torch.cat((source_image_tensor, source_mask_tensor, target_mask_tensor), dim=1)
+            output_tensor = model_forward(model, device, input_tensor)
+
+            output_file = f"{output_dir}/{i+1:02d}_{os.path.basename(target_mask_file)}"
+            save_image(
+                output_tensor.cpu(),
+                output_file,
+                nrow=2 + 6,  # 6 -- refine_time defined in model
+                padding=1,
+                pad_value=255,
+            )
 
 
 def video_service(input_file, output_file, targ):

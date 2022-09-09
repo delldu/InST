@@ -387,6 +387,7 @@ class BasicEncoder(nn.Module):
         #     x = self.dropout(x)
         return torch.split(x, [batch_dim, batch_dim], dim=0)
 
+
 class FlowHead(nn.Module):
     def __init__(self, input_dim=128, hidden_dim=256):
         super(FlowHead, self).__init__()
@@ -516,8 +517,6 @@ class RAFT(nn.Module):
         return up_flow.reshape(N, 2, 8 * H, 8 * W)
 
     def forward(self, x):
-        x = F.interpolate(x, size=(256, 256), mode="bilinear")
-
         source_image = x[:, 0:3, :, :]
         source_mask = x[:, 3:6, :, :]
         target_mask = x[:, 6:9, :, :]
@@ -571,13 +570,10 @@ class RAFT(nn.Module):
             mask = apply_warp_by_field(source_mask.clone(), flow_up)
             warped_image_mask_list.append(mask)
 
-        warped_source_images = warped_image_mask_list[0 : refine_time]
-        warped_source_masks = warped_image_mask_list[refine_time: ]
+        warped_source_images = warped_image_mask_list[0:refine_time]
+        warped_source_masks = warped_image_mask_list[refine_time:]
 
         return torch.cat(
-            [source_mask, target_mask]
-            + warped_source_masks
-            + [source_image, target_mask]
-            + warped_source_images,
+            [source_mask, target_mask] + warped_source_masks + [source_image, target_mask] + warped_source_images,
             dim=0,
         )
