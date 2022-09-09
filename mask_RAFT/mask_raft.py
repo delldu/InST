@@ -113,13 +113,13 @@ class mask_RAFT(nn.Module):
         source_mask,
         target_mask,
         refine_time: int=12,
-    ) -> List[torch.Tensor]:
-
+    ):
         # run the feature network
         fmap1, fmap2 = self.fnet([source_mask, target_mask])
+        # fmap1.size()/fmap2.size() -- [1, 256, 32, 32]
 
-        fmap1 = fmap1.float()
-        fmap2 = fmap2.float()
+        # fmap1 = fmap1.float()
+        # fmap2 = fmap2.float()
 
         # Position Embedding
         pos_embed = (
@@ -127,6 +127,8 @@ class mask_RAFT(nn.Module):
             .permute(0, 2, 1)
             .view(1, -1, fmap1.shape[2], fmap1.shape[3])
         )
+        # pos_embed.size() -- [1, 256, 32, 32]
+
         fmap1 = fmap1 + pos_embed.to(fmap1.device)
         fmap2 = fmap2 + pos_embed.to(fmap2.device)
 
@@ -167,5 +169,13 @@ class mask_RAFT(nn.Module):
             mask = apply_warp_by_field(source_mask.clone(), flow_up)
             warped_image_mask_list.append(mask)
 
-        return warped_image_mask_list
+        warped_source_images = warped_image_mask_list[0 : refine_time]
+        warped_source_masks = warped_image_mask_list[refine_time: ]
 
+        return torch.cat(
+            [source_mask, target_mask]
+            + warped_source_masks
+            + [source_image, target_mask]
+            + warped_source_images,
+            dim=0,
+        )

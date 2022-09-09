@@ -42,7 +42,7 @@ def get_args():
 
     # model options
     parser.add_argument("--checkpoint", type=str, required=True, help="module of warpping")
-    parser.add_argument("--refine_time", type=int, default=3, help="warp refine time")
+    parser.add_argument("--refine_time", type=int, default=6, help="warp refine time")
 
     # other options
     parser.add_argument("--output_dir", type=str, default="./output")
@@ -123,6 +123,7 @@ def test(args):
     checkpoint = torch.load(args.checkpoint)
     # model.load_state_dict({k.replace('module.',''):v for k,v in checkpoint.items()})
     model.load_state_dict(checkpoint["modelstate"])
+    torch.save(model.state_dict(), "/tmp/image_shape_style.pth")
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(exist_ok=True)
@@ -135,7 +136,7 @@ def test(args):
 
     for i, source_mask_path in enumerate(source_mask_paths):
         source_mask_img = Image.open(source_mask_path).convert("RGB")
-        source_mask = source_transform(source_mask_img).unsqueeze(0)
+        source_mask = source_transform(source_mask_img).unsqueeze(0).to(device)
         # source_transform --
         # Compose(
         #     Resize(size=(256, 256), interpolation=bilinear, max_size=None, antialias=None)
@@ -145,7 +146,7 @@ def test(args):
         source_img = Image.open(source_paths[i]).convert("RGB")
         source_image = source_transform(source_img).unsqueeze(0).to(device)
 
-        source_mask = source_mask.to(device)
+        # source_mask = source_mask.to(device)
         for target_mask_path in target_mask_paths:
             target_mask_img = Image.open(target_mask_path).convert("RGB")
             target_mask = target_transform(target_mask_img).unsqueeze(0).to(device)
@@ -155,10 +156,10 @@ def test(args):
             #     ToTensor()
             # )
             with torch.no_grad():
-                warped_image_mask_list = model(source_image, source_mask, target_mask, refine_time=args.refine_time)
+                output_tensor = model(source_image, source_mask, target_mask, refine_time=args.refine_time)
 
-            warped_source_images = warped_image_mask_list[0 : args.refine_time]
-            warped_source_masks = warped_image_mask_list[args.refine_time: ]
+            # warped_source_images = warped_image_mask_list[0 : args.refine_time]
+            # warped_source_masks = warped_image_mask_list[args.refine_time: ]
 
             save_image_name = (
                 source_mask_path.name.split(".")[0]
@@ -167,34 +168,35 @@ def test(args):
                 + f"_refine{args.refine_time}.jpg"
             )
             save_image(
-                torch.cat(
-                    [source_mask, target_mask]
-                    + warped_source_masks
-                    + [source_image, target_mask]
-                    + warped_source_images,
-                    dim=0,
-                ).cpu(),
+                # torch.cat(
+                #     [source_mask, target_mask]
+                #     + warped_source_masks
+                #     + [source_image, target_mask]
+                #     + warped_source_images,
+                #     dim=0,
+                # ).cpu(),
+                output_tensor.cpu(),
                 str(Path(output_dir, save_image_name)),
                 scale_each=True,
                 nrow=2 + args.refine_time,
                 padding=2,
                 pad_value=255,
             )
-            single_image_name = (
-                f"single_"
-                + source_mask_path.name.split(".")[0]
-                + "_shaped_"
-                + target_mask_path.name.split(".")[0]
-                + f"_refine{args.refine_time}.jpg"
-            )
-            save_image(
-                warped_source_images[-1].cpu(),
-                str(Path(output_dir, single_image_name)),
-                scale_each=True,
-                nrow=1,
-                padding=2,
-                pad_value=255,
-            )
+            # single_image_name = (
+            #     f"single_"
+            #     + source_mask_path.name.split(".")[0]
+            #     + "_shaped_"
+            #     + target_mask_path.name.split(".")[0]
+            #     + f"_refine{args.refine_time}.jpg"
+            # )
+            # save_image(
+            #     warped_source_images[-1].cpu(),
+            #     str(Path(output_dir, single_image_name)),
+            #     scale_each=True,
+            #     nrow=1,
+            #     padding=2,
+            #     pad_value=255,
+            # )
 
 
 if __name__ == "__main__":

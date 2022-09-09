@@ -1,0 +1,1 @@
+79c714171a8c0ae9af7957b0620163eb  image_shape_style.pth
