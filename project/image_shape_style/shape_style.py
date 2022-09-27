@@ -10,11 +10,6 @@
 # ************************************************************************************/
 #
 
-"""
-Reference: RAFT: Recurrent All-Pairs Field Transforms for Optical Flow
-Code based on https://github.com/princeton-vl/RAFT/tree/master/core
-"""
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -472,6 +467,11 @@ class BasicUpdateBlock(nn.Module):
 
 
 class RAFT(nn.Module):
+    """
+    Reference: RAFT: Recurrent All-Pairs Field Transforms for Optical Flow
+    Code based on https://github.com/princeton-vl/RAFT/tree/master/core
+    """
+
     def __init__(self):
         super(RAFT, self).__init__()
 

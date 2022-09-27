@@ -1,4 +1,4 @@
-"""Image/Video Photo Style Package."""  # coding=utf-8
+"""Image/Video Shape Style Package."""  # coding=utf-8
 #
 # /************************************************************************************
 # ***
@@ -12,7 +12,6 @@
 __version__ = "1.0.0"
 
 import os
-import time
 import math
 from tqdm import tqdm
 import torch
@@ -42,6 +41,7 @@ def get_model():
     model = model.to(device)
     model.eval()
 
+    print(f"Running on {device} ...")
     model = torch.jit.script(model)
     todos.data.mkdir("output")
     if not os.path.exists("output/image_shape_style.torch"):
@@ -52,8 +52,13 @@ def get_model():
 
 def model_forward(model, device, input_tensor):
     input_tensor = input_tensor.to(device)
-    with torch.no_grad():
-        output_tensor = model(input_tensor)
+    # with torch.no_grad():
+    #     output_tensor = model(input_tensor)
+
+    torch.cuda.synchronize()
+    with torch.jit.optimized_execution(False):
+        output_tensor = todos.model.forward(model, device, input_tensor)
+    torch.cuda.synchronize()
 
     return output_tensor
 
