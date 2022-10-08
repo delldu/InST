@@ -12,7 +12,6 @@
 __version__ = "1.0.0"
 
 import os
-import math
 from tqdm import tqdm
 import torch
 import torch.nn.functional as F
@@ -23,8 +22,6 @@ import todos
 from . import shape_style
 
 import pdb
-
-PHOTO_STYLE_MULTI_TIMES = 8
 
 
 def get_model():
@@ -51,16 +48,7 @@ def get_model():
 
 
 def model_forward(model, device, input_tensor):
-    input_tensor = input_tensor.to(device)
-    # with torch.no_grad():
-    #     output_tensor = model(input_tensor)
-
-    torch.cuda.synchronize()
-    with torch.jit.optimized_execution(False):
-        output_tensor = todos.model.forward(model, device, input_tensor)
-    torch.cuda.synchronize()
-
-    return output_tensor
+    return todos.model.forward(model, device, input_tensor)
 
 
 def image_client(name, input_files, output_dir):

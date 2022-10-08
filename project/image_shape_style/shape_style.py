@@ -20,7 +20,7 @@ import pdb
 
 
 def coords_grid(batch: int, height: int, width: int):
-    coords = torch.meshgrid(torch.arange(height), torch.arange(width))
+    coords = torch.meshgrid(torch.arange(height), torch.arange(width), indexing="ij")
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].repeat(batch, 1, 1, 1)
 
@@ -113,7 +113,7 @@ def image_warp_by_field(img, warp_field):
 
     flow = warp_field.clone().squeeze(dim=0).permute((1, 2, 0))
 
-    grid_x, grid_y = torch.meshgrid(torch.arange(width), torch.arange(height))
+    grid_x, grid_y = torch.meshgrid(torch.arange(width), torch.arange(height), indexing="ij")
     stacked_grid = torch.stack([grid_x, grid_y], dim=2)  # (H, W, 2)
     stacked_grid = stacked_grid.float().to(img.device)
 
@@ -196,7 +196,7 @@ class CorrBlock(nn.Module):
         for i in range(self.num_levels):
             dx = torch.linspace(-r, r, 2 * r + 1)
             dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx), dim=2).to(coords.device)
+            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), dim=2).to(coords.device)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2 ** i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
