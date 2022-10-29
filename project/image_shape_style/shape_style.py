@@ -14,13 +14,17 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+import todos
+
 from typing import List
 
 import pdb
 
 
 def coords_grid(batch: int, height: int, width: int):
-    coords = torch.meshgrid(torch.arange(height), torch.arange(width), indexing="ij")
+    # coords = torch.meshgrid(torch.arange(height), torch.arange(width), indexing="ij")
+    coords = torch.meshgrid(torch.arange(height), torch.arange(width))
+
     coords = torch.stack(coords[::-1], dim=0).float()
     return coords[None].repeat(batch, 1, 1, 1)
 
@@ -113,7 +117,8 @@ def image_warp_by_field(img, warp_field):
 
     flow = warp_field.clone().squeeze(dim=0).permute((1, 2, 0))
 
-    grid_x, grid_y = torch.meshgrid(torch.arange(width), torch.arange(height), indexing="ij")
+    # grid_x, grid_y = torch.meshgrid(torch.arange(width), torch.arange(height), indexing="ij")
+    grid_x, grid_y = torch.meshgrid(torch.arange(width), torch.arange(height))
     stacked_grid = torch.stack([grid_x, grid_y], dim=2)  # (H, W, 2)
     stacked_grid = stacked_grid.float().to(img.device)
 
@@ -196,7 +201,8 @@ class CorrBlock(nn.Module):
         for i in range(self.num_levels):
             dx = torch.linspace(-r, r, 2 * r + 1)
             dy = torch.linspace(-r, r, 2 * r + 1)
-            delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), dim=2).to(coords.device)
+            # delta = torch.stack(torch.meshgrid(dy, dx, indexing="ij"), dim=2).to(coords.device)
+            delta = torch.stack(torch.meshgrid(dy, dx), dim=2).to(coords.device)
 
             centroid_lvl = coords.reshape(batch * h1 * w1, 1, 1, 2) / 2 ** i
             delta_lvl = delta.view(1, 2 * r + 1, 2 * r + 1, 2)
@@ -573,7 +579,31 @@ class RAFT(nn.Module):
         warped_source_images = warped_image_mask_list[0:refine_time]
         warped_source_masks = warped_image_mask_list[refine_time:]
 
-        return torch.cat(
-            [source_mask, target_mask] + warped_source_masks + [source_image, target_mask] + warped_source_images,
-            dim=0,
-        )
+        # return torch.cat(
+        #     [source_mask, target_mask] + warped_source_masks + [source_image, target_mask] + warped_source_images,
+        #     dim=0,
+        # )
+
+        output_list: List[torch.Tensor] = []
+        output_list.append(F.pad(source_mask, (1, 1, 1, 1), mode="constant", value=1.0))
+        output_list.append(F.pad(target_mask, (1, 1, 1, 1), mode="constant", value=1.0))
+        for t in warped_source_masks:
+            output_list.append(F.pad(t, (1, 1, 1, 1), mode="constant", value=1.0))
+
+        output_list.append(F.pad(source_image, (1, 1, 1, 1), mode="constant", value=0.0))
+        output_list.append(F.pad(target_mask, (1, 1, 1, 1), mode="constant", value=1.0))
+        for t in warped_source_images:
+            output_list.append(F.pad(t, (1, 1, 1, 1), mode="constant", value=0.0))
+
+        output_tensor = torch.cat(output_list, dim=0)
+
+        # Make Grid 2x8
+        B, C, H, W = output_tensor.size()
+        k = 0
+        grid = torch.zeros(1, C, 2 * H, 8 * W)
+        for i in range(2):
+            for j in range(8):
+                grid[:, :, i * H : (i + 1) * H, j * W : (j + 1) * W] = output_tensor[k : k + 1, :, :, :].cpu()
+                k = k + 1
+
+        return grid
