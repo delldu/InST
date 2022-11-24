@@ -9,7 +9,7 @@
 # ***
 # ************************************************************************************/
 #
-
+import os
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -500,6 +500,15 @@ class RAFT(nn.Module):
 
         self.corr = CorrBlock(radius=self.args.corr_radius)
 
+        self.load_weights()
+
+
+    def load_weights(self, model_path="models/image_shape_style.pth"):
+        cdir = os.path.dirname(__file__)
+        checkpoint = model_path if cdir == "" else cdir + "/" + model_path
+        self.load_state_dict(torch.load(checkpoint))
+
+
     def initialize_flow(self, img):
         """Flow is represented as difference between two coordinate grids flow = coords1 - coords0"""
         N, C, H, W = img.shape
@@ -592,8 +601,8 @@ class RAFT(nn.Module):
 
         output_list.append(F.pad(source_image, (1, 1, 1, 1), mode="constant", value=0.0))
         output_list.append(F.pad(target_mask, (1, 1, 1, 1), mode="constant", value=1.0))
-        for t in warped_source_images:
-            output_list.append(F.pad(t, (1, 1, 1, 1), mode="constant", value=0.0))
+        for (t, f) in zip(warped_source_images, warped_source_masks):
+            output_list.append(F.pad(t * f, (1, 1, 1, 1), mode="constant", value=1.0))
 
         output_tensor = torch.cat(output_list, dim=0)
 

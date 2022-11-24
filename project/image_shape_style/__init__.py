@@ -25,12 +25,12 @@ import pdb
 def get_model():
     """Create model."""
 
-    model_path = "models/image_shape_style.pth"
-    cdir = os.path.dirname(__file__)
-    checkpoint = model_path if cdir == "" else cdir + "/" + model_path
+    # model_path = "models/image_shape_style.pth"
+    # cdir = os.path.dirname(__file__)
+    # checkpoint = model_path if cdir == "" else cdir + "/" + model_path
 
     model = shape_style.RAFT()
-    todos.model.load(model, checkpoint)
+    # todos.model.load(model, checkpoint)
 
     device = todos.model.get_device()
     model = model.to(device)
